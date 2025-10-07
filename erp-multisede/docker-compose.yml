@@ -1,0 +1,53 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: erp
+      POSTGRES_USER: erp
+      POSTGRES_PASSWORD: erp
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  web:
+    build:
+      context: .
+    command: bash -lc "python src/manage.py migrate && python src/manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - ./src:/app/src
+      - ./deploy:/app/deploy
+      - ./requirements:/app/requirements
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - .env
+    working_dir: /app
+
+  worker:
+    build:
+      context: .
+    command: bash -lc "celery -A erp worker -l info"
+    volumes:
+      - ./src:/app/src
+      - ./requirements:/app/requirements
+    env_file:
+      - .env
+    depends_on:
+      - web
+      - redis
+      - db
+    working_dir: /app
+
+volumes:
+  pgdata:
